@@ -27,10 +27,6 @@ public class ElizonPermsBungeeCommand extends Command implements TabExecutor {
 
     @Override
     public void execute(@NotNull CommandSender sender, @NotNull String[] args) {
-        if (!(sender instanceof ProxiedPlayer player)) {
-            sender.sendMessage(TextComponent.fromLegacy("Only players can use this command."));
-            return;
-        }
 
         if(!sender.hasPermission("elizonperms.command.execute")) {
             sender.sendMessage(TextComponent.fromLegacy("§f[§9EP§f] §aThis server is using the free ElizonPerms Lite permissions system by ELIZONMedia. Thanks for using!"));
@@ -38,7 +34,7 @@ public class ElizonPermsBungeeCommand extends Command implements TabExecutor {
         }
 
         if (args.length < 3) {
-            player.sendMessage(TextComponent.fromLegacy("§f[§9EP§f] §9Usage for groups:\n" +
+            sender.sendMessage(TextComponent.fromLegacy("§f[§9EP§f] §9Usage for groups:\n" +
                 "  /epb group <name> info\n" +
                 "  /epb group <name> permission info\n" +
                 "  /epb group <name> create\n" +
@@ -84,7 +80,7 @@ public class ElizonPermsBungeeCommand extends Command implements TabExecutor {
                 "  /epb track <name> next <group>\n" +
                 "  /epb track <name> rankup <username>"));
 
-            player.sendMessage(TextComponent.fromLegacy("§f[§9EP§f] §cDATA MultiState can be set by player, but must be modified via Plugin API."));
+            sender.sendMessage(TextComponent.fromLegacy("§f[§9EP§f] §cDATA MultiState can be set by player, but must be modified via Plugin API."));
             return;
         }
 
@@ -93,13 +89,13 @@ public class ElizonPermsBungeeCommand extends Command implements TabExecutor {
         String actionType = args[2];
 
         if (targetType.equalsIgnoreCase("group")) {
-            handleGroupAction(player, targetName, actionType, args);
+            handleGroupAction(sender, targetName, actionType, args);
         } else if (targetType.equalsIgnoreCase("user")) {
-            handleUserAction(player, targetName, actionType, args);
+            handleUserAction(sender, targetName, actionType, args);
         } else if (targetType.equalsIgnoreCase("track")) {
-            handleTrackAction(player, targetName, actionType, args);
+            handleTrackAction(sender, targetName, actionType, args);
         } else {
-            player.sendMessage(TextComponent.fromLegacy("§f[§9EP§f] §cInvalid target type. Use 'group' or 'user'."));
+            sender.sendMessage(TextComponent.fromLegacy("§f[§9EP§f] §cInvalid target type. Use 'group' or 'user'."));
         }
     }
 
@@ -235,7 +231,7 @@ public class ElizonPermsBungeeCommand extends Command implements TabExecutor {
     }
 
 
-    private void handleGroupAction(ProxiedPlayer player, String targetName, String actionType, String[] args) {
+    private void handleGroupAction(CommandSender player, String targetName, String actionType, String[] args) {
         PermGroup group = new PermGroup(targetName);
 
         if (!player.hasPermission("elizonperms.group." + actionType.toLowerCase())) {
@@ -520,7 +516,7 @@ public class ElizonPermsBungeeCommand extends Command implements TabExecutor {
     }
 
 
-    private void handleUserAction(ProxiedPlayer player, String targetName, String actionType, String[] args) {
+    private void handleUserAction(CommandSender player, String targetName, String actionType, String[] args) {
         PermPlayer permPlayer;
         if(targetName.toLowerCase().startsWith("uuid:")) {
             permPlayer = new PermPlayer(targetName.toLowerCase().replaceFirst("uuid:", ""));
