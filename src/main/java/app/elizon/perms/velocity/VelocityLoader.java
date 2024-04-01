@@ -19,7 +19,7 @@ import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import org.slf4j.Logger;
 
-@Plugin(authors = "ELIZONMedia", id = "elizonperms", name = "ELIZONPerms", version = "v0.1-alpha")
+@Plugin(authors = "ELIZONMedia", id = "elizonperms", name = "ELIZONPerms", version = "0.5-beta")
 public class VelocityLoader {
 
     private final ProxyServer server;
