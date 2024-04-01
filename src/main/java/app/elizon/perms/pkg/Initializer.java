@@ -88,7 +88,7 @@ public class Initializer {
         JSONObject configObj = new JSONObject();
         configObj.put("discordBotToken", "TOKEN");
 
-        JSONFile file = new JSONFile("plugins/ElizonPerms/config.json",
+        JSONFile file = new JSONFile("plugins/ELIZONPerms/config.json",
                 new JSONValue() {
                     @Override
                     public JSONObject object() {
