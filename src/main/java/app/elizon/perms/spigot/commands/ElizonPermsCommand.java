@@ -1,6 +1,7 @@
 package app.elizon.perms.spigot.commands;
 
 import app.elizon.perms.pkg.group.PermGroup;
+import app.elizon.perms.pkg.group.track.PermGroupTrack;
 import app.elizon.perms.pkg.player.PermPlayer;
 import app.elizon.perms.pkg.util.MultiState;
 import org.bukkit.Bukkit;
@@ -9,35 +10,75 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
-import org.bukkit.permissions.Permission;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
 
     @Override
-    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+    public boolean onCommand(@NotNull CommandSender sender, Command command, @NotNull String label, @NotNull String[] args) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage("Only players can use this command.");
-            return true;
+            return false;
         }
 
         if (!sender.hasPermission("elizonperms.command.execute")) {
             sender.sendMessage("§f[§9EP§f] §aThis server is using the free ElizonPerms Lite permissions system by ELIZONMedia. Thanks for using!");
-            return true;
+            return false;
         }
 
         if (args.length < 3) {
-            player.sendMessage("§f[§9EP§f] §9Usage for groups: /epb group <name> <permission|info|create|delete|rename|clone> <add|remove|set|info> <string> <true|false>");
-            player.sendMessage("§f[§9EP§f] §9Usage for users: /epb user <name> <group|permission|info> <add|remove|set|info> <string> <true|false|data>");
+            player.sendMessage("§f[§9EP§f] §9Usage for groups:\n" +
+                    "  /ep group <name> info\n" +
+                    "  /ep group <name> permission info\n" +
+                    "  /ep group <name> create\n" +
+                    "  /ep group <name> delete\n" +
+                    "  /ep group <name> rename <new name>\n" +
+                    "  /ep group <name> clone <name>\n" +
+                    "  /ep group <name> permission add <permission>\n" +
+                    "  /ep group <name> permission remove <permission>\n" +
+                    "  /ep group <name> permission set <permission> true\n" +
+                    "  /ep group <name> permission set <permission> false\n" +
+                    "  /ep group <name> permission set <permission> data (Initialize data via API)\n" +
+                    "  /ep group <name> inherit info\n" +
+                    "  /ep group <name> inherit add <group to inherit>\n" +
+                    "  /ep group <name> inherit remove <group>\n" +
+                    "  /ep group <name> setdefault\n" +
+                    "  /ep group <name> setprefix <prefix>\n" +
+                    "  /ep group <name> setsuffix <suffix>\n" +
+                    "  /ep group <name> setheight <height>\n" +
+                    "§f[§9EP§f] §9Usage for users:\n" +
+                    "  /ep user <name> info\n" +
+                    "  /ep user <name> permission info\n" +
+                    "  /ep user <name> group info\n" +
+                    "  /ep user <name> group add <group>\n" +
+                    "  /ep user <name> group addtimed <group> <time in hours>\n" +
+                    "  /ep user <name> group set <group> true\n" +
+                    "  /ep user <name> group set <group> false\n" +
+                    "  /ep user <name> group set <group> data (Initialize data via API)\n" +
+                    "  /ep user <name> group settimed <group> true <time in hours>\n" +
+                    "  /ep user <name> group settimed <group> false <time in hours>\n" +
+                    "  /ep user <name> group settimed <group> data <time in hours> (Initialize data via API)\n" +
+                    "  /ep user <name> permission add <permission>\n" +
+                    "  /ep user <name> permission remove <permission>\n" +
+                    "  /ep user <name> permission set <permission> true\n" +
+                    "  /ep user <name> permission set <permission> false\n" +
+                    "  /ep user <name> permission set <permission> data (Initialize data via API)\n" +
+                    "§f[§9EP§f] §9Usage for tracks:\n" +
+                    "  /ep track <name> list\n" +
+                    "  /ep track <name> delete\n" +
+                    "  /ep track <name> create <group> <group> <group>...\n" +
+                    "  /ep track <name> insertbefore <group to insert> <next higher group>\n" +
+                    "  /ep track <name> add <new highest group>\n" +
+                    "  /ep track <name> remove <group>\n" +
+                    "  /ep track <name> next <group>\n" +
+                    "  /ep track <name> rankup <username>");
+
             player.sendMessage("§f[§9EP§f] §cDATA MultiState can be set by player, but must be modified via Plugin API.");
-            return true;
+            return false;
         }
 
         String targetType = args[0];
@@ -48,6 +89,8 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
             handleGroupAction(player, targetName, actionType, args);
         } else if (targetType.equalsIgnoreCase("user")) {
             handleUserAction(player, targetName, actionType, args);
+        } else if (targetType.equalsIgnoreCase("track")) {
+            handleTrackAction(player, targetName, actionType, args);
         } else {
             player.sendMessage("§f[§9EP§f] §cInvalid target type. Use 'group' or 'user'.");
         }
@@ -55,7 +98,144 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    private void handleGroupAction(Player player, String targetName, String actionType, String[] args) {
+    private void handleTrackAction(CommandSender player, String targetName, String actionType, String[] args) {
+        PermGroupTrack groupTrack = new PermGroupTrack();
+
+        if (!player.hasPermission("elizonperms.track." + actionType.toLowerCase())) {
+            player.sendMessage("§f[§9EP§f] §cYou don't have permission to perform this action on tracks.");
+            return;
+        }
+
+        switch (actionType.toLowerCase()) {
+            case "insertbefore":
+                // Insert group before next
+                if (args.length < 5) {
+                    player.sendMessage("§f[§9EP§f] §cMissing arguments.");
+                    return;
+                }
+                String groupToInsert = args[3];
+                String nextGroup = args[4];
+                groupTrack.insertGroupBeforeNext(targetName, groupToInsert, nextGroup);
+                player.sendMessage("§f[§9EP§f] §aInserted group " + groupToInsert + " before " + nextGroup + " in track " + targetName);
+                break;
+            case "create":
+                // Add group to end
+                if (args.length < 3) {
+                    player.sendMessage("§f[§9EP§f] §cMissing arguments.");
+                    return;
+                }
+
+                List<String> str = new ArrayList<>();
+
+                for(int i = 3; i < args.length; i++) {
+                    if(args[i] != null) {
+                        str.add(args[i].toLowerCase());
+                    }
+                }
+
+                groupTrack.createTrack(targetName, str);
+                player.sendMessage("§f[§9EP§f] §aCreated track " + targetName + " with the following groups: " + str);
+                break;
+            case "add":
+                // Add group to end
+                if (args.length < 4) {
+                    player.sendMessage("§f[§9EP§f] §cMissing arguments.");
+                    return;
+                }
+                String groupToAdd = args[3];
+                groupTrack.addGroupToEnd(targetName, groupToAdd);
+                player.sendMessage("§f[§9EP§f] §aAdded group " + groupToAdd + " to the end of track " + targetName);
+                break;
+
+            case "remove":
+                // Remove group from track
+                if (args.length < 4) {
+                    player.sendMessage("§f[§9EP§f] §cMissing arguments.");
+                    return;
+                }
+                String groupToRemove = args[3];
+                groupTrack.removeGroupFromTrack(targetName, groupToRemove);
+                player.sendMessage("§f[§9EP§f] §cRemoved group " + groupToRemove + " from the track " + targetName);
+                break;
+
+            case "delete":
+                // Delete track
+                groupTrack.deleteTrack(targetName);
+                player.sendMessage("§f[§9EP§f] §cDeleted track " + targetName);
+                break;
+
+            case "next":
+                // Get next group
+                if (args.length < 4) {
+                    player.sendMessage("§f[§9EP§f] §cMissing arguments.");
+                    return;
+                }
+                String currentGroup = args[3];
+                String nextGroup2 = groupTrack.getNextGroup(targetName, currentGroup);
+                if (nextGroup2 != null) {
+                    player.sendMessage("§f[§9EP§f] §bNext group after " + currentGroup + " in track " + targetName + ": " + nextGroup2);
+                } else {
+                    player.sendMessage("§f[§9EP§f] §cNo next group found after " + currentGroup + " in track " + targetName);
+                }
+                break;
+
+            case "list":
+                // List groups in track
+                List<String> groups = groupTrack.getGroups(targetName);
+                if (groups != null && !groups.isEmpty()) {
+                    player.sendMessage("§f[§9EP§f] §bGroups in track " + targetName + ": " + String.join(", ", groups));
+                } else {
+                    player.sendMessage("§f[§9EP§f] §cNo groups found in track " + targetName);
+                }
+                break;
+
+            case "rankup":
+                // Rank up player
+                if (args.length < 4) {
+                    player.sendMessage("§f[§9EP§f] §cMissing arguments.");
+                    return;
+                }
+
+                if (!player.hasPermission("elizonperms.user.group.set")) {
+                    player.sendMessage("§f[§9EP§f] §cYou don't have permission to perform this action on groups.");
+                    return;
+                }
+
+                String playerName = args[3].toLowerCase();
+
+                PermPlayer target;
+                if (playerName.startsWith("uuid:")) {
+                    target = new PermPlayer(playerName.replaceFirst("uuid:", ""));
+                } else {
+                    if (Bukkit.getPlayer(playerName) == null) {
+                        player.sendMessage("§f[§9EP§f] §cThe target player is offline. Use the uuid like this instead: \"uuid:UUID HERE\"");
+                        return;
+                    }
+                    target = new PermPlayer(Bukkit.getPlayer(playerName).getUniqueId().toString());
+                }
+
+                if (target.getGroups().size() != 1) {
+                    player.sendMessage("§f[§9EP§f] §cThere is no rank to rankup. Please note, that the player must have only one rank.");
+                } else {
+                    String next = groupTrack.getNextGroup(targetName, target.getGroups().getFirst());
+                    if (next != null) {
+                        target.setGroup(next, -1);
+                        player.sendMessage("§f[§9EP§f] §aRanked up player from group " + target.getGroups().getFirst() + " to " + next + ".");
+                    } else {
+                        player.sendMessage("§f[§9EP§f] §cThere is no rank to rankup. Please note, that the player must have only one rank.");
+                    }
+                }
+                break;
+
+            default:
+                player.sendMessage("§f[§9EP§f] §cInvalid action type.");
+                break;
+        }
+    }
+
+
+
+    private void handleGroupAction(CommandSender player, String targetName, String actionType, String[] args) {
         PermGroup group = new PermGroup(targetName);
 
         if (!player.hasPermission("elizonperms.group." + actionType.toLowerCase())) {
@@ -64,9 +244,7 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
         }
 
         if (actionType.equalsIgnoreCase("permission")) {
-
-
-            if(args.length < 4) {
+            if (args.length < 4) {
                 player.sendMessage("§f[§9EP§f] §cMissing argument.");
                 return;
             }
@@ -81,7 +259,7 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
                         return;
                     }
 
-                    if(args.length < 5) {
+                    if (args.length < 5) {
                         player.sendMessage("§f[§9EP§f] §cMissing argument.");
                         return;
                     }
@@ -95,7 +273,7 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
                         return;
                     }
 
-                    if(args.length < 5) {
+                    if (args.length < 5) {
                         player.sendMessage("§f[§9EP§f] §cMissing argument.");
                         return;
                     }
@@ -109,7 +287,7 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
                         return;
                     }
                     //value
-                    if(args.length < 6) {
+                    if (args.length < 6) {
                         player.sendMessage("§f[§9EP§f] §cMissing argument.");
                         return;
                     }
@@ -141,7 +319,7 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
                     break;
                 default:
                     player.sendMessage(
-                            "§f[§9EP§f] §bCommand Help §f(/epb group " + targetName + " permission ... <string> <true|false|data>) \n" +
+                            "§f[§9EP§f] §bCommand Help §f(/ep group " + targetName + " permission ... <string> <true|false|data>) \n" +
                                     "§f[§9EP§f] §9> §aadd\n" +
                                     "§f[§9EP§f] §9> §cremove\n" +
                                     "§f[§9EP§f] §9> §aset\n" +
@@ -149,14 +327,125 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
                     );
                     break;
             }
+        } else if (actionType.equalsIgnoreCase("inherit")) {
+            if (args.length < 4) {
+                player.sendMessage("§f[§9EP§f] §cMissing argument.");
+                return;
+            }
+
+            String action = args[3];
+
+            switch (action.toLowerCase()) {
+                case "add":
+                    // Permission check for add action
+                    if (!player.hasPermission("elizonperms.group.inherit.add")) {
+                        player.sendMessage("§f[§9EP§f] §cYou don't have permission to add inherit groups to groups.");
+                        return;
+                    }
+
+                    if (args.length < 5) {
+                        player.sendMessage("§f[§9EP§f] §cMissing argument.");
+                        return;
+                    }
+                    group.addGroupInherit(args[4].toLowerCase());
+                    player.sendMessage("§f[§9EP§f] §aNow inheriting group " + args[4] + " at group " + targetName);
+                    break;
+                case "remove":
+                    // Permission check for remove action
+                    if (!player.hasPermission("elizonperms.group.inherit.remove")) {
+                        player.sendMessage("§f[§9EP§f] §cYou don't have permission to remove group inherits from groups.");
+                        return;
+                    }
+
+                    if (args.length < 5) {
+                        player.sendMessage("§f[§9EP§f] §cMissing argument.");
+                        return;
+                    }
+                    group.removeGroupInherit(args[4].toLowerCase());
+                    player.sendMessage("§f[§9EP§f] §cRemoving inherit of group " + args[4] + " from group " + targetName);
+                    break;
+                case "info":
+                    // Permission check for info action
+                    if (!player.hasPermission("elizonperms.group.inherit.info")) {
+                        player.sendMessage("§f[§9EP§f] §cYou don't have permission to view inherit info for groups.");
+                        return;
+                    }
+                    player.sendMessage("§f[§9EP§f] §bGetting info about inherits of group " + targetName + "...");
+                    List<String> inheritVals = group.getInheritedGroups();
+
+                    StringBuilder builder = new StringBuilder("§f[§9EP§f] §bGroup Inherit Info §f(RAW)");
+                    if (!inheritVals.isEmpty()) {
+                        inheritVals.forEach((value) -> builder.append("\n").append(value));
+                        builder.append("\n");
+                    }
+
+                    player.sendMessage(builder.toString());
+                    break;
+                default:
+                    player.sendMessage(
+                            "§f[§9EP§f] §bCommand Help §f(/ep group " + targetName + " permission ... <string> <true|false|data>) \n" +
+                                    "§f[§9EP§f] §9> §aadd\n" +
+                                    "§f[§9EP§f] §9> §cremove\n" +
+                                    "§f[§9EP§f] §9> §aset\n" +
+                                    "§f[§9EP§f] §9> §ainfo"
+                    );
+                    break;
+            }
+        } else if (actionType.equalsIgnoreCase("setdefault")) {
+            // Permission check for create action
+            if (!player.hasPermission("elizonperms.group.create")) {
+                player.sendMessage("§f[§9EP§f] §cYou don't have permission to create groups.");
+                return;
+            }
+
+            group.setAsDefaultGroup();
+            player.sendMessage("§f[§9EP§f] §aGroup " + targetName + " is now the default group.");
+        } else if (actionType.equalsIgnoreCase("setprefix")) {
+            // Permission check for create action
+            if (!player.hasPermission("elizonperms.group.create")) {
+                player.sendMessage("§f[§9EP§f] §cYou don't have permission to create groups.");
+                return;
+            }
+
+            if (args.length < 4) {
+                player.sendMessage("§f[§9EP§f] §cMissing argument.");
+                return;
+            }
+            group.setGroupPrefixSuffix(args[3].replaceAll("&", "§"), null, -1);
+            player.sendMessage("§f[§9EP§f] §aGroup " + targetName + " is now the default group.");
+        } else if (actionType.equalsIgnoreCase("setsuffix")) {
+            // Permission check for create action
+            if (!player.hasPermission("elizonperms.group.create")) {
+                player.sendMessage("§f[§9EP§f] §cYou don't have permission to create groups.");
+                return;
+            }
+
+            if (args.length < 4) {
+                player.sendMessage("§f[§9EP§f] §cMissing argument.");
+                return;
+            }
+            group.setGroupPrefixSuffix(null, args[3].replaceAll("&", "§"), -1);
+            player.sendMessage("§f[§9EP§f] §aGroup " + targetName + " is now the default group.");
+        } else if (actionType.equalsIgnoreCase("setheight")) {
+            // Permission check for create action
+            if (!player.hasPermission("elizonperms.group.create")) {
+                player.sendMessage("§f[§9EP§f] §cYou don't have permission to create groups.");
+                return;
+            }
+
+            if (args.length < 4) {
+                player.sendMessage("§f[§9EP§f] §cMissing argument.");
+                return;
+            }
+            group.setGroupPrefixSuffix(null, null, Integer.parseInt(args[3]));
+            player.sendMessage("§f[§9EP§f] §aGroup " + targetName + " is now the default group.");
         } else if (actionType.equalsIgnoreCase("create")) {
             // Permission check for create action
             if (!player.hasPermission("elizonperms.group.create")) {
                 player.sendMessage("§f[§9EP§f] §cYou don't have permission to create groups.");
                 return;
             }
-            group.build();
-            player.sendMessage("§f[§9EP§f] §aGroup " + targetName + " created successfully.");
+            player.sendMessage("§f[§9EP§f] §aGroup " + targetName + " ( " + group.build() + " ) created.");
         } else if (actionType.equalsIgnoreCase("delete")) {
             // Permission check for delete action
             if (!player.hasPermission("elizonperms.group.delete")) {
@@ -171,7 +460,11 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
                 player.sendMessage("§f[§9EP§f] §cYou don't have permission to rename groups.");
                 return;
             }
-            String newName = args[5];
+            if (args.length < 4) {
+                player.sendMessage("§f[§9EP§f] §cMissing argument.");
+                return;
+            }
+            String newName = args[3];
             group.renameGroup(newName);
             player.sendMessage("§f[§9EP§f] §bGroup " + targetName + " renamed to " + newName + ".");
         } else if (actionType.equalsIgnoreCase("info")) {
@@ -181,29 +474,53 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
                 return;
             }
             int groupSize = group.getPlayersInGroup().size();
-            player.sendMessage("§f[§9EP§f] §bGetting general info about group " + targetName + " (Size: " + groupSize + ")");
+            String prefix = group.getPrefix();
+            String suffix = group.getSuffix();
+            int height = group.getSortHeight();
+            List<String> inheritedGroups = group.getInheritedGroups();
+            player.sendMessage("§f[§9EP§f] §bGeneral Information for Group: " + targetName + "\n" +
+                    "§f[§9EP§f] §bSize: " + groupSize + "\n" +
+                    "§f[§9EP§f] §bPrefix: " + prefix + "\n" +
+                    "§f[§9EP§f] §bSuffix: " + suffix + "\n" +
+                    "§f[§9EP§f] §bSort Height: " + height + "\n" +
+                    "§f[§9EP§f] §bInherited Groups: " + inheritedGroups);
         } else if (actionType.equalsIgnoreCase("clone")) {
             // Permission check for clone action
             if (!player.hasPermission("elizonperms.group.clone")) {
                 player.sendMessage("§f[§9EP§f] §cYou don't have permission to clone groups.");
                 return;
             }
-            group.cloneGroup(args[5], false);
-            player.sendMessage("§f[§9EP§f] §aCloning group " + targetName + " to group " + args[5]);
+            group.cloneGroup(args[3], false);
+            player.sendMessage("§f[§9EP§f] §aCloning group " + targetName + " to group " + args[3]);
         } else {
             // Help message
             player.sendMessage(
-                    "§f[§9EP§f] §bCommand Help §f(/epb group " + targetName + " <action>)\n" +
+                    "§f[§9EP§f] §bCommand Help §f(/ep group " + targetName + " <action>)\n" +
                             "§f[§9EP§f] §9> §apermission\n" +
                             "§f[§9EP§f] §9> §ainfo\n" +
-                            "§f[§9EP§f] §9> §aclone"
+                            "§f[§9EP§f] §9> §aclone\n" +
+                            "§f[§9EP§f] §9> §arename\n" +
+                            "§f[§9EP§f] §9> §adelete\n" +
+                            "§f[§9EP§f] §9> §acreate\n" +
+                            "§f[§9EP§f] §9> §asetdefault\n" +
+                            "§f[§9EP§f] §9> §asetprefix\n" +
+                            "§f[§9EP§f] §9> §asetsuffix\n" +
+                            "§f[§9EP§f] §9> §asetheight"
             );
         }
     }
 
-
     private void handleUserAction(Player player, String targetName, String actionType, String[] args) {
-        PermPlayer permPlayer = new PermPlayer(Bukkit.getOfflinePlayer(targetName).getUniqueId().toString());
+        PermPlayer permPlayer;
+        if(targetName.toLowerCase().startsWith("uuid:")) {
+            permPlayer = new PermPlayer(targetName.toLowerCase().replaceFirst("uuid:", ""));
+        } else {
+            if(Bukkit.getPlayer(targetName) == null) {
+                player.sendMessage("§f[§9EP§f] §cThe target player is offline. Use uuid: with the uuid of the target player instead.");
+                return;
+            }
+            permPlayer = new PermPlayer(Objects.requireNonNull(Bukkit.getPlayer(targetName)).getUniqueId().toString());
+        }
 
         if (!player.hasPermission("elizonperms.user." + actionType.toLowerCase())) {
             player.sendMessage("§f[§9EP§f] §cYou don't have permission to perform this action on users.");
@@ -229,8 +546,24 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
                         player.sendMessage("§f[§9EP§f] §cMissing argument.");
                         return;
                     }
-                    permPlayer.addGroup(args[4].toLowerCase());
+                    permPlayer.addGroup(args[4].toLowerCase(), -1);
                     player.sendMessage("§f[§9EP§f] §aAdding user " + targetName + " to group " + args[4]);
+                    break;
+                case "addtimed":
+                    // Permission check for set action
+                    if (!player.hasPermission("elizonperms.user.group.set")) {
+                        player.sendMessage("§f[§9EP§f] §cYou don't have permission to set user groups.");
+                        return;
+                    }
+                    if(args.length < 6) {
+                        player.sendMessage("§f[§9EP§f] §cMissing argument.");
+                        return;
+                    }
+
+                    long time = 1000*60*60*Long.parseLong(args[5]);
+
+                    permPlayer.setGroup(args[4].toLowerCase(), time);
+                    player.sendMessage("§f[§9EP§f] §aSetting group for user " + targetName + " to " + args[4]);
                     break;
                 case "remove":
                     // Permission check for remove action
@@ -255,7 +588,23 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
                         player.sendMessage("§f[§9EP§f] §cMissing argument.");
                         return;
                     }
-                    permPlayer.setGroup(args[4].toLowerCase());
+                    permPlayer.setGroup(args[4].toLowerCase(), -1);
+                    player.sendMessage("§f[§9EP§f] §aSetting group for user " + targetName + " to " + args[4]);
+                    break;
+                case "settimed":
+                    // Permission check for set action
+                    if (!player.hasPermission("elizonperms.user.group.set")) {
+                        player.sendMessage("§f[§9EP§f] §cYou don't have permission to set user groups.");
+                        return;
+                    }
+                    if(args.length < 6) {
+                        player.sendMessage("§f[§9EP§f] §cMissing argument.");
+                        return;
+                    }
+
+                    long time2 = 1000*60*60*Long.parseLong(args[5]);
+
+                    permPlayer.setGroup(args[4].toLowerCase(), time2);
                     player.sendMessage("§f[§9EP§f] §aSetting group for user " + targetName + " to " + args[4]);
                     break;
                 case "info":
@@ -269,10 +618,12 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
                     break;
                 default:
                     player.sendMessage(
-                            "§f[§9EP§f] §bCommand Help §f(/epb user " + targetName + " group ... <group>)\n" +
+                            "§f[§9EP§f] §bCommand Help §f(/ep user " + targetName + " group ... <group>)\n" +
                                     "§f[§9EP§f] §9> §aadd\n" +
+                                    "§f[§9EP§f] §9> §aaddtimed\n" +
                                     "§f[§9EP§f] §9> §cremove\n" +
                                     "§f[§9EP§f] §9> §aset\n" +
+                                    "§f[§9EP§f] §9> §asettimed\n" +
                                     "§f[§9EP§f] §9> §ainfo"
                     );
                     break;
@@ -352,7 +703,7 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
                     break;
                 default:
                     player.sendMessage(
-                            "§f[§9EP§f] §bCommand Help §f(/epb user " + targetName + " permission ... <string> <true|false|data>)\n" +
+                            "§f[§9EP§f] §bCommand Help §f(/ep user " + targetName + " permission ... <string> <true|false|data>)\n" +
                                     "§f[§9EP§f] §9> §aadd\n" +
                                     "§f[§9EP§f] §9> §cremove\n" +
                                     "§f[§9EP§f] §9> §aset\n" +
@@ -371,7 +722,7 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
             player.sendMessage("§f[§9EP§f] §bGroups: " + groups);
         } else {
             player.sendMessage(
-                    "§f[§9EP§f] §bCommand Help §f(/epb user " + targetName + " <action>)\n" +
+                    "§f[§9EP§f] §bCommand Help §f(/ep user " + targetName + " <action>)\n" +
                             "§f[§9EP§f] §9> §apermission\n" +
                             "§f[§9EP§f] §9> §ainfo"
             );
@@ -382,61 +733,126 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
 
     @Nullable
     @Override
-    public List<String> onTabComplete(@NotNull CommandSender commandSender, @NotNull Command command, @NotNull String s, @NotNull String[] args) {
-        if (!commandSender.hasPermission("elizonperms.autocomplete")) {
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String s, @NotNull String[] args) {
+        if (!sender.hasPermission("elizonperms.autocomplete")) {
             return Collections.emptyList();
         }
 
+        List<String> completions = new ArrayList<>();
+
         if (args.length == 1) {
             // Complete target type (group/user)
-            return List.of("group", "user");
+            completions.add("group");
+            completions.add("user");
+            completions.add("track");
         } else if (args.length == 2) {
             // Complete target name (players/groups)
-            if (args[0].equalsIgnoreCase("group")) {
+            if ("group".equalsIgnoreCase(args[0])) {
                 // Complete group names
                 // You can fetch group names from your data source
                 PermGroup group = new PermGroup(null);
-                return group.getAllGroups();
-            } else if (args[0].equalsIgnoreCase("user")) {
+                completions.addAll(group.getAllGroups());
+            } else if ("user".equalsIgnoreCase(args[0])) {
                 // Complete online player names
-                List<String> names = new ArrayList<>(Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
-                names.addFirst("uuid:");
-                return names;
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    completions.add(player.getName());
+                }
+                completions.add("uuid:");
+            } else if ("track".equalsIgnoreCase(args[0])) {
+                // Complete online player names
+                return new PermGroupTrack().getAllTracks();
             }
         } else if (args.length == 3) {
-            // Complete action type (permission/info/create/delete/rename/clone)
-            return List.of("permission", "info", "create", "delete", "rename", "clone");
+            // Complete action type (permission/info/create/delete/rename/clone/track)
+            if ("group".equalsIgnoreCase(args[0])) {
+                completions.clear();
+                completions.add("create");
+                completions.add("delete");
+                completions.add("clone");
+                completions.add("rename");
+                completions.add("permission");
+                completions.add("info");
+                completions.add("setdefault");
+                completions.add("setprefix");
+                completions.add("setsuffix");
+                completions.add("setheight");
+            } else if ("user".equalsIgnoreCase(args[0])) {
+                completions.add("group");
+                completions.add("permission");
+                completions.add("info");
+            } else if ("track".equalsIgnoreCase(args[0])) {
+                completions.clear();
+                completions.add("insertbefore");
+                completions.add("add");
+                completions.add("delete");
+                completions.add("next");
+                completions.add("list");
+                completions.add("rankup");
+            }
         } else if (args.length == 4) {
             // Complete action (add/remove/set/info)
-            if (args[0].equalsIgnoreCase("group")) {
-                return List.of("add", "remove", "set", "info");
+            completions.add("add");
+            completions.add("remove");
+            completions.add("set");
+            completions.add("info");
+            if("rankup".equalsIgnoreCase(args[2])) {
+                completions.clear();
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    completions.add(player.getName());
+                }
+            } else if ("group".equalsIgnoreCase(args[0])) {
+                if("create".equalsIgnoreCase(args[2])) {
+                    return Collections.emptyList();
+                }
             }
-            return List.of("add", "remove", "set", "info");
+            if ("group".equalsIgnoreCase(args[2])) {
+                completions.add("addtimed");
+                completions.add("settimed");
+            } else if ("delete".equalsIgnoreCase(args[2])) {
+                return Collections.emptyList();
+            } else if ("track".equalsIgnoreCase(args[0])) {
+                completions.clear();
+                if ("remove".equalsIgnoreCase(args[2])) {
+                    PermGroupTrack track = new PermGroupTrack();
+                    completions.addAll(track.getGroups(args[1].toLowerCase()));
+                } else if ("add".equalsIgnoreCase(args[2])) {
+                    PermGroup group = new PermGroup(null);
+                    completions.addAll(group.getAllGroups());
+                }
+            }
         } else if (args.length == 5) {
             // Complete permission/group name for actions that require it
-            if (args[2].equalsIgnoreCase("permission") || args[2].equalsIgnoreCase("group")) {
+            if ("permission".equalsIgnoreCase(args[2])) {
+                return Collections.emptyList();
+            } else if ("group".equalsIgnoreCase(args[2])) {
                 // Provide your list of permissions/groups here
-                List<String> perms = new ArrayList<>();
-                for (Permission permission : Bukkit.getPluginManager().getPermissions().stream().toList()) {
-                    perms.add(permission.getName());
-                }
-                return perms;
-            } else if (args[2].equalsIgnoreCase("rename") || args[2].equalsIgnoreCase("clone")) {
                 PermGroup group = new PermGroup(null);
-                return group.getAllGroups();
-            } else if (args[2].equalsIgnoreCase("delete") || args[2].equalsIgnoreCase("create")) {
-                // Command ends after this point, no further completions needed
-                return List.of();
+                completions.addAll(group.getAllGroups());
+                // Add more permissions/groups as needed
+            } else if ("delete".equalsIgnoreCase(args[2])) {
+                return Collections.emptyList();
+            } else if ("insertbefore".equalsIgnoreCase(args[2])) {
+                PermGroupTrack track = new PermGroupTrack();
+                completions.addAll(track.getGroups(args[1].toLowerCase()));
+            } else if("track".equalsIgnoreCase(args[0])) {
+                completions.clear();
+                if("insertbefore".equalsIgnoreCase(args[2])) {
+                    PermGroup group = new PermGroup(null);
+                    completions.addAll(group.getAllGroups());
+                }
             }
         } else if (args.length == 6) {
             // Complete true/false for the 6th argument
-            return List.of("true", "false");
-        } else if (args.length == 7 && args[4].equalsIgnoreCase("clone")) {
-            // Complete group name for clone action
-            // You can fetch group names from your data source
-            PermGroup group = new PermGroup(null);
-            return group.getAllGroups();
+            if ("permission".equalsIgnoreCase(args[2])) {
+                completions.add("data");
+                completions.add("true");
+                completions.add("false");
+            } else if ("group".equalsIgnoreCase(args[2])) {
+                completions.clear();
+                completions.add("time in hours");
+            }
         }
-        return List.of();
+
+        return completions;
     }
 }

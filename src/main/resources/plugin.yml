@@ -7,9 +7,9 @@ website: https://elizon.app
 main: app.elizon.perms.spigot.SpigotLoader
 version: v0.1-alpha
 commands:
-  elizonperms:
+  ep:
     aliases:
-      - ep
+      - elizonperms
       - perms
       - elizonp
     permission: elizonperms.command.execute

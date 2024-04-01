@@ -3,20 +3,16 @@ package app.elizon.perms.pkg.player;
 import app.elizon.perms.pkg.Initializer;
 import app.elizon.perms.pkg.exception.IllegalMultiStateException;
 import app.elizon.perms.pkg.group.PermGroup;
+import app.elizon.perms.pkg.group.trace.GroupTrace;
 import app.elizon.perms.pkg.util.MultiState;
-import co.plocki.mysql.MySQLInsert;
-import co.plocki.mysql.MySQLPush;
-import co.plocki.mysql.MySQLRequest;
-import co.plocki.mysql.MySQLResponse;
+import co.plocki.mysql.*;
+import org.checkerframework.checker.units.qual.A;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class PermPlayer {
 
@@ -35,6 +31,18 @@ public class PermPlayer {
             MySQLInsert insert = new MySQLInsert();
             insert.prepare(Initializer.getPlayerTable(), uuid, "{\"permissions\": {}}", "{\"groups\": []}");
             insert.execute();
+        }
+
+        request = new MySQLRequest();
+        request.prepare(Initializer.getPermGroupTime().getTableName());
+        request.addRequirement("uuid", uuid);
+        response = new MySQLResponse();
+        if(!response.isEmpty()) {
+            for (HashMap<String, String> stringStringHashMap : response.rawAll()) {
+                if(Long.parseLong(stringStringHashMap.get("addedForTime"))>= System.currentTimeMillis()) {
+                    new PermPlayer(stringStringHashMap.get("uuid")).removeGroup(stringStringHashMap.get("targetGroup"));
+                }
+            }
         }
     }
 
@@ -77,6 +85,52 @@ public class PermPlayer {
         push.execute();
     }
 
+    public String getGroupPrefix() {
+        List<String> groups = getGroups();
+        if(!groups.isEmpty()) {
+            if(groups.size() == 1) {
+                String tmp = new PermGroup(groups.getFirst()).getPrefix();
+                if(tmp != null) {
+                    if(!tmp.equalsIgnoreCase("null")) {
+                        return tmp;
+                    }
+                }
+            } else {
+                groups.sort(Comparator.comparingInt(object -> new PermGroup(object).getSortHeight()));
+                String tmp = new PermGroup(groups.getFirst()).getPrefix();
+                if(tmp != null) {
+                    if(!tmp.equalsIgnoreCase("null")) {
+                        return tmp;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    public String getGroupSuffix() {
+        List<String> groups = getGroups();
+        if(!groups.isEmpty()) {
+            if(groups.size() == 1) {
+                String tmp = new PermGroup(groups.getFirst()).getSuffix();
+                if(tmp != null) {
+                    if(!tmp.equalsIgnoreCase("null")) {
+                        return tmp;
+                    }
+                }
+            } else {
+                groups.sort(Comparator.comparingInt(object -> new PermGroup(object).getSortHeight()));
+                String tmp = new PermGroup(groups.getFirst()).getSuffix();
+                if(tmp != null) {
+                    if(!tmp.equalsIgnoreCase("null")) {
+                        return tmp;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     public void setMultiStatePermission(String permission, @NotNull MultiState state, JSONObject object) {
         MySQLRequest request = new MySQLRequest();
         request.prepare("permissionsJson", Initializer.getPlayerTable().getTableName());
@@ -98,8 +152,7 @@ public class PermPlayer {
         push.execute();
     }
 
-
-    public void addGroup(String name) {
+    public void addGroup(String name, long time) {
         MySQLRequest request = new MySQLRequest();
         request.prepare("groupsJson", Initializer.getPlayerTable().getTableName());
         request.addRequirement("uuid", uuid);
@@ -111,8 +164,17 @@ public class PermPlayer {
         push.prepare(Initializer.getPlayerTable().getTableName(), "groupsJson", obj.toString());
         push.addRequirement("uuid", uuid);
         push.execute();
-    }
 
+        MySQLInsert insert = new MySQLInsert();
+        insert.prepare(Initializer.getPlayerRankTraces(), uuid, "group:ADD", name.toLowerCase(), "false", "true", System.currentTimeMillis());
+        insert.execute();
+
+        if(time != -1) {
+            MySQLInsert insert1 = new MySQLInsert();
+            insert1.prepare(Initializer.getPermGroupTime(), uuid, name.toLowerCase(), System.currentTimeMillis()+time);
+            insert1.execute();
+        }
+    }
 
     public void removeGroup(String name) {
         MySQLRequest request = new MySQLRequest();
@@ -134,10 +196,41 @@ public class PermPlayer {
         push.prepare(Initializer.getPlayerTable().getTableName(), "groupsJson", obj.toString());
         push.addRequirement("uuid", uuid);
         push.execute();
+
+        MySQLInsert insert = new MySQLInsert();
+        insert.prepare(Initializer.getPlayerRankTraces(), uuid, "group:REMOVE", name.toLowerCase(), "false", "false", System.currentTimeMillis());
+        insert.execute();
+
+        MySQLRequest request1 = new MySQLRequest();
+        request1.prepare(Initializer.getPermGroupTime().getTableName());
+        request1.addRequirement("uuid", uuid);
+        request1.addRequirement("targetGroup", name.toLowerCase());
+        MySQLResponse response = new MySQLResponse();
+        if(!response.isEmpty()) {
+            MySQLDelete delete = new MySQLDelete();
+            delete.prepare(Initializer.getPermGroupTime().getTableName());
+            delete.addRequirement("uuid", uuid);
+            delete.addRequirement("targetGroup", name.toLowerCase());
+            delete.execute();
+        }
     }
 
+    public @Nullable HashMap<String, Long> getCurrentGroupTimeStamps() {
+        MySQLRequest request1 = new MySQLRequest();
+        request1.prepare(Initializer.getPermGroupTime().getTableName());
+        request1.addRequirement("uuid", uuid);
+        MySQLResponse response = new MySQLResponse();
+        if(!response.isEmpty()) {
+            HashMap<String, Long> times = new HashMap<>();
+            for (HashMap<String, String> stringStringHashMap : response.rawAll()) {
+                times.put(stringStringHashMap.get("targetGroup"), Long.parseLong(stringStringHashMap.get("addedForTime")));
+            }
+            return times;
+        }
+        return null;
+    }
 
-    public void setGroup(String name) {
+    public void setGroup(String name, long time) {
         MySQLRequest request = new MySQLRequest();
         request.prepare("groupsJson", Initializer.getPlayerTable().getTableName());
         request.addRequirement("uuid", uuid);
@@ -149,6 +242,27 @@ public class PermPlayer {
         push.prepare(Initializer.getPlayerTable().getTableName(), "groupsJson", obj.toString());
         push.addRequirement("uuid", uuid);
         push.execute();
+
+        MySQLInsert insert = new MySQLInsert();
+        insert.prepare(Initializer.getPlayerRankTraces(), uuid, "group:SET", name.toLowerCase(), "false", "false", System.currentTimeMillis());
+        insert.execute();
+
+        MySQLRequest request1 = new MySQLRequest();
+        request1.prepare(Initializer.getPermGroupTime().getTableName());
+        request1.addRequirement("uuid", uuid);
+        MySQLResponse response = new MySQLResponse();
+        if(!response.isEmpty()) {
+            MySQLDelete delete = new MySQLDelete();
+            delete.prepare(Initializer.getPermGroupTime().getTableName());
+            delete.addRequirement("uuid", uuid);
+            delete.execute();
+        }
+
+        if(time != -1) {
+            MySQLInsert insert1 = new MySQLInsert();
+            insert1.prepare(Initializer.getPermGroupTime(), uuid, name.toLowerCase(), System.currentTimeMillis()+time);
+            insert1.execute();
+        }
     }
 
     public List<String> getGroups() {
@@ -256,7 +370,14 @@ public class PermPlayer {
             }
         }
 
-        return false;
+        MySQLRequest request = new MySQLRequest();
+        request.prepare(Initializer.getPermFallbackGroup().getTableName());
+        MySQLResponse response = request.execute();
+        if(response.isEmpty()) {
+            return false;
+        }
+
+        return new PermGroup(response.getString("targetGroup")).simpleHasPermission(permission);
     }
 
 
@@ -290,6 +411,44 @@ public class PermPlayer {
             return state == MultiState.DATA;
         }
         return false;
+    }
+
+    public List<GroupTrace> getGroupTraces() {
+
+        MySQLRequest request = new MySQLRequest();
+        request.prepare(Initializer.getPlayerRankTraces().getTableName());
+        request.addRequirement("uuid", uuid);
+        MySQLResponse response = request.execute();
+        List<GroupTrace> traces = new ArrayList<>();
+        if(!response.isEmpty()) {
+            for (HashMap<String, String> stringStringHashMap : response.rawAll()) {
+                traces.add(new GroupTrace() {
+                    @Override
+                    public String oldGroup() {
+                        return stringStringHashMap.get("oldGroup");
+                    }
+
+                    @Override
+                    public String newGroup() {
+                        return stringStringHashMap.get("newGroup");
+                    }
+
+                    @Override
+                    public boolean temporary() {
+                        return Boolean.parseBoolean(stringStringHashMap.get("addedForTime"));
+                    }
+
+                    @Override
+                    public long changeDateTimeStamp() {
+                        return Long.parseLong(stringStringHashMap.get("changeDate"));
+                    }
+                });
+            }
+            traces.sort(Comparator.comparingLong(GroupTrace::changeDateTimeStamp));
+            return traces;
+        }
+
+        return new ArrayList<>();
     }
 
 }

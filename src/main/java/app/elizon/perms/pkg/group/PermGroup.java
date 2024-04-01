@@ -2,6 +2,9 @@ package app.elizon.perms.pkg.group;
 
 import app.elizon.perms.pkg.Initializer;
 import app.elizon.perms.pkg.exception.IllegalMultiStateException;
+import app.elizon.perms.pkg.group.trace.GroupTrace;
+import app.elizon.perms.pkg.group.track.PermGroupTrack;
+import app.elizon.perms.pkg.player.PermPlayer;
 import app.elizon.perms.pkg.util.MultiState;
 import co.plocki.mysql.*;
 import org.jetbrains.annotations.NotNull;
@@ -9,10 +12,7 @@ import org.jetbrains.annotations.Nullable;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class PermGroup {
 
@@ -24,6 +24,21 @@ public class PermGroup {
         }
 
         this.name = name;
+    }
+
+    public void setAsDefaultGroup() {
+        MySQLRequest request = new MySQLRequest();
+        request.prepare(Initializer.getPermFallbackGroup().getTableName());
+        MySQLResponse response = request.execute();
+        if(!response.isEmpty()) {
+            MySQLPush push = new MySQLPush();
+            push.prepare(Initializer.getPermFallbackGroup().getTableName(), "targetGroup", name);
+            push.execute();
+        } else {
+            MySQLInsert insert = new MySQLInsert();
+            insert.prepare(Initializer.getPermFallbackGroup(), name);
+            insert.execute();
+        }
     }
 
     public List<String> getAllGroups() {
@@ -63,7 +78,75 @@ public class PermGroup {
         }
     }
 
+    public void setGroupPrefixSuffix(@Nullable String prefix, @Nullable String suffix, int sortHeight) {
+        MySQLRequest request = new MySQLRequest();
+        request.prepare(Initializer.getPermGroupPrefixSuffix().getTableName());
+        request.addRequirement("targetGroup", name);
+        MySQLResponse response = request.execute();
+
+        if(response.isEmpty()) {
+            MySQLInsert insert = new MySQLInsert();
+            insert.prepare(Initializer.getPermGroupPrefixSuffix(), name, prefix, suffix, sortHeight);
+            insert.execute();
+        } else {
+            MySQLPush push = new MySQLPush();
+            push.prepare(Initializer.getPermGroupPrefixSuffix().getTableName(), "prefix", prefix);
+            push.addRequirement("targetGroup", name);
+            push.execute();
+            push = new MySQLPush();
+            push.prepare(Initializer.getPermGroupPrefixSuffix().getTableName(), "suffix", suffix);
+            push.addRequirement("targetGroup", name);
+            push.execute();
+            push = new MySQLPush();
+            push.prepare(Initializer.getPermGroupPrefixSuffix().getTableName(), "sortHeight", sortHeight);
+            push.addRequirement("targetGroup", name);
+            push.execute();
+        }
+    }
+
+    public String getPrefix() {
+        MySQLRequest request = new MySQLRequest();
+        request.prepare(Initializer.getPermGroupPrefixSuffix().getTableName());
+        request.addRequirement("targetGroup", name);
+        MySQLResponse response = request.execute();
+
+        if(!response.isEmpty()) {
+            return response.getString("prefix");
+        }
+        return null;
+    }
+
+    public String getSuffix() {
+        MySQLRequest request = new MySQLRequest();
+        request.prepare(Initializer.getPermGroupPrefixSuffix().getTableName());
+        request.addRequirement("targetGroup", name);
+        MySQLResponse response = request.execute();
+
+        if(!response.isEmpty()) {
+            return response.getString("suffix");
+        }
+        return null;
+    }
+
+    public int getSortHeight() {
+        MySQLRequest request = new MySQLRequest();
+        request.prepare(Initializer.getPermGroupPrefixSuffix().getTableName());
+        request.addRequirement("targetGroup", name);
+        MySQLResponse response = request.execute();
+
+        if(!response.isEmpty()) {
+            return response.getInt("sortHeight");
+        }
+        return -1;
+    }
+
     public void deleteGroup() {
+
+        for (String s : getPlayersInGroup()) {
+            PermPlayer player = new PermPlayer(s);
+            player.removeGroup(name);
+        }
+
         MySQLDelete delete = new MySQLDelete();
         delete.prepare(Initializer.getGroupTable().getTableName());
         delete.addRequirement("name", name);
@@ -144,7 +227,7 @@ public class PermGroup {
 
         MySQLInsert insert = new MySQLInsert();
 
-        insert.prepare(Initializer.getGroupTable(), List.of(name, permissionsJson));
+        insert.prepare(Initializer.getGroupTable(), List.of(nameOfClone, permissionsJson));
         insert.execute();
 
         if(addAlreadyContainingPlayers) {
@@ -165,10 +248,46 @@ public class PermGroup {
                 push.prepare(Initializer.getPlayerTable().getTableName(), "groupsJson", groups.toString());
                 push.addRequirement("uuid", uuid);
                 push.execute();
+
+                MySQLInsert insert2 = new MySQLInsert();
+                insert2.prepare(Initializer.getPlayerRankTraces(), uuid, name, nameOfClone.toLowerCase(), "false", "true", System.currentTimeMillis());
+                insert2.execute();
             }
         }
 
         return new PermGroup(nameOfClone);
+    }
+
+    public void addGroupInherit(String groupToInherit) {
+        MySQLInsert insert = new MySQLInsert();
+        insert.prepare(Initializer.getPermGroupInherits(), name, groupToInherit.toLowerCase());
+        insert.execute();
+    }
+
+    public void removeGroupInherit(String groupBeingInherited) {
+        MySQLDelete delete = new MySQLDelete();
+        delete.prepare(Initializer.getPermGroupInherits().getTableName());
+        delete.addRequirement("targetGroup", name);
+        delete.addRequirement("inheritedGroup", groupBeingInherited.toLowerCase());
+        delete.execute();
+    }
+
+    public List<String> getInheritedGroups() {
+        MySQLRequest request = new MySQLRequest();
+        request.prepare(Initializer.getPermGroupInherits().getTableName());
+        request.addRequirement("targetGroup", name);
+        MySQLResponse response = request.execute();
+
+        List<String> groups = new ArrayList<>();
+        if(!response.isEmpty()) {
+            for (HashMap<String, String> stringStringHashMap : response.rawAll()) {
+                groups.add(stringStringHashMap.get("inheritedGroup"));
+            }
+        }
+        if(!groups.isEmpty()) {
+            groups.sort(Comparator.comparingInt(value -> new PermGroup(value).getSortHeight()));
+        }
+        return groups;
     }
 
     public PermGroup renameGroup(String newName) {
@@ -177,6 +296,66 @@ public class PermGroup {
         push.addRequirement("name", name);
 
         push.execute();
+
+        List<String> players = getPlayersInGroup();
+        for (String player : players) {
+            PermPlayer permPlayer = new PermPlayer(player);
+
+            HashMap<String, Long> times = permPlayer.getCurrentGroupTimeStamps();
+            long time = (times == null ? -1 : (!times.containsKey(name) ? -1 : times.get(name)-System.currentTimeMillis()));
+
+            permPlayer.removeGroup(name);
+            permPlayer.addGroup(newName.toLowerCase(), time);
+
+            MySQLInsert insert = new MySQLInsert();
+            insert.prepare(Initializer.getPlayerRankTraces(), player, name, newName.toLowerCase(), "false", "false", System.currentTimeMillis());
+            insert.execute();
+        }
+
+        push = new MySQLPush();
+        push.prepare(Initializer.getPermGroupInherits().getTableName(), "targetGroup", newName.toLowerCase());
+        push.addRequirement("targetGroup", name);
+        push.execute();
+
+        push = new MySQLPush();
+        push.prepare(Initializer.getPermGroupInherits().getTableName(), "inheritedGroup", newName.toLowerCase());
+        push.addRequirement("inheritedGroup", name);
+        push.execute();
+
+
+        push = new MySQLPush();
+        push.prepare(Initializer.getPermGroupPrefixSuffix().getTableName(), "targetGroup", newName.toLowerCase());
+        push.addRequirement("targetGroup", name);
+        push.execute();
+
+
+        push = new MySQLPush();
+        push.prepare(Initializer.getPermGroupTime().getTableName(), "targetGroup", newName.toLowerCase());
+        push.addRequirement("targetGroup", name);
+        push.execute();
+
+        push = new MySQLPush();
+        push.prepare(Initializer.getPlayerRankTraces().getTableName(), "oldGroup", newName.toLowerCase());
+        push.addRequirement("oldGroup", name);
+        push.execute();
+
+        push = new MySQLPush();
+        push.prepare(Initializer.getPlayerRankTraces().getTableName(), "newGroup", newName.toLowerCase());
+        push.addRequirement("newGroup", name);
+        push.execute();
+
+        MySQLRequest request = new MySQLRequest();
+        request.prepare(Initializer.getPermFallbackGroup().getTableName());
+        if(request.execute().getString("targetGroup").equalsIgnoreCase(name)) {
+            push = new MySQLPush();
+            push.prepare(Initializer.getPermFallbackGroup().getTableName(), "targetGroup", newName.toLowerCase());
+            push.execute();
+        }
+
+        for (String allTrack : new PermGroupTrack().getAllTracks()) {
+            new PermGroupTrack().renameGroupInTrack(allTrack, name, newName.toLowerCase());
+        }
+
         name = newName.toLowerCase();
         return this;
     }
@@ -277,6 +456,13 @@ public class PermGroup {
             // If the permission is found in the database
             if (perm.equals(permission)) {
                 return getAllSimpleSetPermissions().get(permission);
+            }
+        }
+
+        for (String inheritedGroup : getInheritedGroups()) {
+            PermGroup group = new PermGroup(inheritedGroup);
+            if(group.getAllSimpleSetPermissions().containsKey(permission)) {
+                return group.simpleHasPermission(permission);
             }
         }
 

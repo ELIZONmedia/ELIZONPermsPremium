@@ -46,9 +46,9 @@ public class SpigotLoader extends JavaPlugin implements Listener {
         }
 
         Bukkit.getPluginManager().registerEvents(this, this);
-        this.getCommand("elizonperms").setExecutor(new ElizonPermsCommand());
-        this.getCommand("elizonperms").setTabCompleter(new ElizonPermsCommand());
-        this.getCommand("elizonperms").setAliases(List.of("ep", "perms", "elizonp"));
+        this.getCommand("ep").setExecutor(new ElizonPermsCommand());
+        this.getCommand("ep").setTabCompleter(new ElizonPermsCommand());
+        this.getCommand("ep").setAliases(List.of("elizonperms", "perms", "elizonp"));
     }
 
     @EventHandler
