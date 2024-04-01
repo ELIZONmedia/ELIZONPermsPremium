@@ -4,7 +4,6 @@ import app.elizon.perms.pkg.group.PermGroup;
 import app.elizon.perms.pkg.group.track.PermGroupTrack;
 import app.elizon.perms.pkg.player.PermPlayer;
 import app.elizon.perms.pkg.util.MultiState;
-import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -93,7 +92,6 @@ public class ElizonPermsCommand implements CommandExecutor, TabCompleter {
         }
         return true;
     }
-
 
     private void handleTrackAction(CommandSender player, String targetName, String actionType, String[] args) {
         PermGroupTrack groupTrack = new PermGroupTrack();

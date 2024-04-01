@@ -767,7 +767,6 @@ public class ElizonPermsBungeeCommand extends Command implements TabExecutor {
         } else if (args.length == 3) {
             // Complete action type (permission/info/create/delete/rename/clone/track)
             if ("group".equalsIgnoreCase(args[0])) {
-                completions.clear();
                 completions.add("create");
                 completions.add("delete");
                 completions.add("clone");
@@ -783,7 +782,6 @@ public class ElizonPermsBungeeCommand extends Command implements TabExecutor {
                 completions.add("permission");
                 completions.add("info");
             } else if ("track".equalsIgnoreCase(args[0])) {
-                completions.clear();
                 completions.add("insertbefore");
                 completions.add("add");
                 completions.add("delete");
@@ -837,7 +835,6 @@ public class ElizonPermsBungeeCommand extends Command implements TabExecutor {
                 PermGroupTrack track = new PermGroupTrack();
                 completions.addAll(track.getGroups(args[1].toLowerCase()));
             } else if("track".equalsIgnoreCase(args[0])) {
-                completions.clear();
                 if("insertbefore".equalsIgnoreCase(args[2])) {
                     PermGroup group = new PermGroup(null);
                     completions.addAll(group.getAllGroups());
@@ -850,7 +847,6 @@ public class ElizonPermsBungeeCommand extends Command implements TabExecutor {
                 completions.add("true");
                 completions.add("false");
             } else if ("group".equalsIgnoreCase(args[2])) {
-                completions.clear();
                 completions.add("time in hours");
             }
         }

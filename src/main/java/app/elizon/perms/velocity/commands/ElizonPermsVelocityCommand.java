@@ -752,6 +752,7 @@ public class ElizonPermsVelocityCommand implements SimpleCommand {
             // Complete target type (group/user)
             completions.add("group");
             completions.add("user");
+            completions.add("track");
         } else if (args.length == 2) {
             // Complete target name (players/groups)
             if ("group".equalsIgnoreCase(args[0])) {
@@ -765,21 +766,66 @@ public class ElizonPermsVelocityCommand implements SimpleCommand {
                     completions.add(player.getUsername());
                 }
                 completions.add("uuid:");
+            } else if ("track".equalsIgnoreCase(args[0])) {
+                // Complete online player names
+                return new PermGroupTrack().getAllTracks();
             }
         } else if (args.length == 3) {
-            // Complete action type (permission/info/create/delete/rename/clone)
-            completions.add("permission");
-            completions.add("info");
-            completions.add("create");
-            completions.add("delete");
-            completions.add("rename");
-            completions.add("clone");
+            // Complete action type (permission/info/create/delete/rename/clone/track)
+            if ("group".equalsIgnoreCase(args[0])) {
+                completions.add("create");
+                completions.add("delete");
+                completions.add("clone");
+                completions.add("rename");
+                completions.add("permission");
+                completions.add("info");
+                completions.add("setdefault");
+                completions.add("setprefix");
+                completions.add("setsuffix");
+                completions.add("setheight");
+            } else if ("user".equalsIgnoreCase(args[0])) {
+                completions.add("group");
+                completions.add("permission");
+                completions.add("info");
+            } else if ("track".equalsIgnoreCase(args[0])) {
+                completions.add("insertbefore");
+                completions.add("add");
+                completions.add("delete");
+                completions.add("next");
+                completions.add("list");
+                completions.add("rankup");
+            }
         } else if (args.length == 4) {
             // Complete action (add/remove/set/info)
             completions.add("add");
             completions.add("remove");
             completions.add("set");
             completions.add("info");
+            if("rankup".equalsIgnoreCase(args[2])) {
+                completions.clear();
+                for (Player player : proxy.getAllPlayers()) {
+                    completions.add(player.getUsername());
+                }
+            } else if ("group".equalsIgnoreCase(args[0])) {
+                if("create".equalsIgnoreCase(args[2])) {
+                    return Collections.emptyList();
+                }
+            }
+            if ("group".equalsIgnoreCase(args[2])) {
+                completions.add("addtimed");
+                completions.add("settimed");
+            } else if ("delete".equalsIgnoreCase(args[2])) {
+                return Collections.emptyList();
+            } else if ("track".equalsIgnoreCase(args[0])) {
+                completions.clear();
+                if ("remove".equalsIgnoreCase(args[2])) {
+                    PermGroupTrack track = new PermGroupTrack();
+                    completions.addAll(track.getGroups(args[1].toLowerCase()));
+                } else if ("add".equalsIgnoreCase(args[2])) {
+                    PermGroup group = new PermGroup(null);
+                    completions.addAll(group.getAllGroups());
+                }
+            }
         } else if (args.length == 5) {
             // Complete permission/group name for actions that require it
             if ("permission".equalsIgnoreCase(args[2])) {
@@ -789,18 +835,25 @@ public class ElizonPermsVelocityCommand implements SimpleCommand {
                 PermGroup group = new PermGroup(null);
                 completions.addAll(group.getAllGroups());
                 // Add more permissions/groups as needed
-            } else if ("rename".equalsIgnoreCase(args[2]) || "clone".equalsIgnoreCase(args[2])) {
+            } else if ("delete".equalsIgnoreCase(args[2])) {
                 return Collections.emptyList();
-            } else if ("delete".equalsIgnoreCase(args[2]) || "create".equalsIgnoreCase(args[2])) {
-                // Command ends after this point, no further completions needed
-                return Collections.emptyList();
+            } else if ("insertbefore".equalsIgnoreCase(args[2])) {
+                PermGroupTrack track = new PermGroupTrack();
+                completions.addAll(track.getGroups(args[1].toLowerCase()));
+            } else if("track".equalsIgnoreCase(args[0])) {
+                if("insertbefore".equalsIgnoreCase(args[2])) {
+                    PermGroup group = new PermGroup(null);
+                    completions.addAll(group.getAllGroups());
+                }
             }
         } else if (args.length == 6) {
             // Complete true/false for the 6th argument
-            completions.add("true");
-            completions.add("false");
             if ("permission".equalsIgnoreCase(args[2])) {
                 completions.add("data");
+                completions.add("true");
+                completions.add("false");
+            } else if ("group".equalsIgnoreCase(args[2])) {
+                completions.add("time in hours");
             }
         }
 
