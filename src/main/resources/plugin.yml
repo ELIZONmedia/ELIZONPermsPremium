@@ -13,3 +13,9 @@ commands:
       - perms
       - elizonp
     permission: elizonperms.command.execute
+  el:
+    aliases:
+      - elizonlatency
+      - latency
+      - elizonpl
+    permission: elizonperms.command.latency

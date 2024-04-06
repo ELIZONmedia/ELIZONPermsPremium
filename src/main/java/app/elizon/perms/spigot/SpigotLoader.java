@@ -2,6 +2,7 @@ package app.elizon.perms.spigot;
 
 import app.elizon.perms.pkg.Initializer;
 import app.elizon.perms.pkg.player.PermPlayer;
+import app.elizon.perms.spigot.commands.ElizonLatencyCommand;
 import app.elizon.perms.spigot.commands.ElizonPermsCommand;
 import app.elizon.perms.spigot.handler.SpigotPermHandler;
 import org.bukkit.Bukkit;
@@ -47,8 +48,10 @@ public class SpigotLoader extends JavaPlugin implements Listener {
 
         Bukkit.getPluginManager().registerEvents(this, this);
         this.getCommand("ep").setExecutor(new ElizonPermsCommand());
+        this.getCommand("el").setExecutor(new ElizonLatencyCommand());
         this.getCommand("ep").setTabCompleter(new ElizonPermsCommand());
         this.getCommand("ep").setAliases(List.of("elizonperms", "perms", "elizonp"));
+        this.getCommand("el").setAliases(List.of("elizonlatency", "latency", "elizonpl"));
     }
 
     @EventHandler
