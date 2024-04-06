@@ -13,10 +13,10 @@ public class ElizonLatencyCommand implements CommandExecutor {
 
         if(sender.hasPermission("elizonperms.command.latency")) {
             sender.sendMessage("§f[§9EP§f] §aLatency: " + (System.currentTimeMillis()-now) + "ms");
+            return true;
         } else {
             sender.sendMessage("§f[§9EP§f] §cYou don't have the permission to do that.");
+            return true;
         }
-
-        return true;
     }
 }
