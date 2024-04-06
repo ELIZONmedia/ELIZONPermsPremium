@@ -1,4 +1,5 @@
 # ELIZONPerms - Permissions System with Forge (1.16.5), Velocity, Spigot (Paper) +1.16.5 and Bungeecord support with a Discord Bot
+[![Maven Package](https://github.com/ELIZONmedia/ELIZONPermsPremium/actions/workflows/maven-publish.yml/badge.svg?event=push)](https://github.com/ELIZONmedia/ELIZONPermsPremium/actions/workflows/maven-publish.yml)
 
 This is a comprehensive Minecraft permissions system designed to facilitate managing player permissions, groups, and ranks efficiently. It offers a wide range of features including group management, player assignment to groups, permission management, rank tracking, prefix/suffix registration, and more.
 
