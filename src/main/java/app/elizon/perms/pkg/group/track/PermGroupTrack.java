@@ -12,7 +12,7 @@ import java.util.List;
 
 public class PermGroupTrack {
 
-    public boolean createTrack(String name, List<String> groups) {
+    public void createTrack(String name, List<String> groups) {
         name = name.toLowerCase();
 
         MySQLRequest request = new MySQLRequest();
@@ -31,10 +31,8 @@ public class PermGroupTrack {
             insert.prepare(Initializer.getPermRankTracks(), name, json.toString());
             insert.execute(); // Assuming execute() method exists
 
-            return true;
         }
 
-        return false;
     }
 
     public List<String> getAllTracks() {

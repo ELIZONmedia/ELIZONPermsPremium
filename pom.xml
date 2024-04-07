@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>app.elizon.perms</groupId>
-    <artifactId>ELIZONPerm</artifactId>
+    <artifactId>elizonperms</artifactId>
     <version>0.5-beta</version>
 
     <properties>
@@ -68,9 +68,9 @@
 
     <distributionManagement>
         <repository>
-            <id>github</id>
+            <id>github-epp</id>
             <name>GitHub ELIZONMedia Apache Maven Packages</name>
-            <url>https://maven.pkg.github.com/ELIZONMedia/ELIZONPermsPermium</url>
+            <url>https://maven.pkg.github.com/ELIZONMedia/ELIZONPermsPremium</url>
         </repository>
     </distributionManagement>
 
